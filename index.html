@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Événements</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f5f5f5;
+}
+
+.container {
+    padding: 12px;
+}
+
+/* Carte */
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* Header ligne principale */
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Heure */
+.time {
+    font-weight: bold;
+    font-size: 16px;
+    color: #007aff;
+    min-width: 60px;
+}
+
+/* Texte */
+.content {
+    flex: 1;
+    margin-left: 10px;
+}
+
+.title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.place {
+    font-size: 13px;
+    color: #777;
+}
+
+/* bouton */
+.toggle {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #007aff;
+    cursor: pointer;
+}
+
+.details {
+    display: none;
+    margin-top: 10px;
+}
+
+/* description cachée */
+.description {
+    font-size: 13px;
+    color: #444;
+    line-height: 1.4;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container" id="app"></div>
+
+<script type="module">
+import { WordPressProvider } from "./js/providers/wordpress.js";
+import { loadEvents } from "./js/loader.js";
+
+function renderCard(event) {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const timeEl = document.createElement("div");
+    timeEl.className = "time";
+    timeEl.textContent = event.time ?? "";
+
+    const content = document.createElement("div");
+    content.className = "content";
+
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = event.title;
+
+    const place = document.createElement("div");
+    place.className = "place";
+    place.textContent = event.place ?? "";
+
+    content.append(title, place);
+    row.append(timeEl, content);
+
+    const toggle = document.createElement("div");
+    toggle.className = "toggle";
+    toggle.textContent = "Voir plus";
+
+    const details = document.createElement("div");
+    details.className = "details";
+
+    const desc = document.createElement("div");
+    desc.className = "description";
+    desc.textContent = event.description ?? "";
+
+    details.appendChild(desc);
+
+    if (event.url && /^https?:\/\//.test(event.url)) {
+        const link = document.createElement("a");
+        link.className = "external";
+        link.href = event.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Voir sur le site";
+        details.appendChild(link);
+    }
+
+    toggle.addEventListener("click", () => {
+        const isOpen = details.style.display === "block";
+        details.style.display = isOpen ? "none" : "block";
+        toggle.textContent = isOpen ? "Voir plus" : "Voir moins";
+    });
+
+    card.append(row, toggle, details);
+    return card;
+}
+
+const providers = [
+    new WordPressProvider("https://jondi.fr"),
+];
+
+const events = await loadEvents(providers, new Date("2026-04-20"));
+const container = document.getElementById("app");
+events.forEach(event => container.appendChild(renderCard(event)));
+</script>
+
+</body>
+</html>

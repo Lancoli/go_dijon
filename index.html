@@ -149,7 +149,10 @@ const providers = [
     new WordPressProvider("https://jondi.fr"),
 ];
 
-const events = await loadEvents(providers, new Date("2026-04-20"));
+const today = new Date();
+const todayDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+const events = await loadEvents(providers, new Date(todayDateString));
+
 const container = document.getElementById("app");
 events.forEach(event => container.appendChild(renderCard(event)));
 </script>

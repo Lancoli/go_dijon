@@ -16,6 +16,33 @@ body {
     padding: 12px;
 }
 
+/* Loader */
+#loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    gap: 18px;
+}
+
+#loader svg {
+    animation: loader-pulse 1.6s ease-in-out infinite;
+    filter: drop-shadow(0 4px 12px rgba(0,122,255,0.25));
+}
+
+@keyframes loader-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(0.93); }
+}
+
+.loader-text {
+    font-size: 15px;
+    font-weight: 500;
+    color: #888;
+    letter-spacing: 0.01em;
+}
+
 /* Carte */
 .card {
     background: white;
@@ -40,7 +67,7 @@ body {
     min-width: 60px;
 }
 
-/* Texte */
+/* Texte (conservé pour rétrocompat) */
 .content {
     flex: 1;
     margin-left: 10px;
@@ -76,16 +103,99 @@ body {
     color: #444;
     line-height: 1.4;
 }
+
+/* Image événement */
+.event-img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex-shrink: 0;
+    margin-right: 12px;
+    background: #e8f2ff;
+}
+
+.row-meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Onglets */
+.tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px 12px 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.tab {
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1.5px solid #007aff;
+    color: #007aff;
+    background: white;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+
+.tab.active {
+    background: #007aff;
+    color: white;
+}
+
+.tab:disabled {
+    border-color: #ccc;
+    color: #ccc;
+    cursor: not-allowed;
+}
 </style>
 </head>
 
 <body>
 
-<div class="container" id="app"></div>
+<div class="tabs">
+    <button class="tab active" data-provider="all">Tous</button>
+    <button class="tab" data-provider="wordpress">Jondi.fr</button>
+    <button class="tab" disabled>Autre (bientôt)</button>
+</div>
+
+<div id="loader">
+    <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Anneaux -->
+        <rect x="20" y="6" width="5" height="14" rx="2.5" fill="#007aff"/>
+        <rect x="39" y="6" width="5" height="14" rx="2.5" fill="#007aff"/>
+        <!-- Corps -->
+        <rect x="8" y="15" width="48" height="42" rx="8" fill="#e8f2ff" stroke="#007aff" stroke-width="2.5"/>
+        <!-- Bandeau header -->
+        <rect x="8" y="15" width="48" height="16" rx="8" fill="#007aff"/>
+        <rect x="8" y="23" width="48" height="8" fill="#007aff"/>
+        <!-- Points de jours -->
+        <circle cx="22" cy="44" r="3.5" fill="#007aff" opacity="0.25"/>
+        <circle cx="32" cy="44" r="3.5" fill="#007aff"/>
+        <circle cx="42" cy="44" r="3.5" fill="#007aff" opacity="0.25"/>
+        <circle cx="22" cy="52" r="3.5" fill="#007aff" opacity="0.25"/>
+        <circle cx="32" cy="52" r="3.5" fill="#007aff" opacity="0.25"/>
+        <!-- Étoile sur le jour actif -->
+        <polygon points="32,36 33.5,40.5 38,40.5 34.5,43 36,47.5 32,45 28,47.5 29.5,43 26,40.5 30.5,40.5"
+                 fill="#007aff" transform="scale(0.55) translate(26, 22)"/>
+    </svg>
+    <span class="loader-text">Chargement des événements…</span>
+</div>
+
+<div class="container" id="app" style="display:none"></div>
 
 <script type="module">
 import { WordPressProvider } from "./js/providers/wordpress.js";
-import { loadEvents } from "./js/loader.js";
+import { loadEvents, loadEventsForProvider } from "./js/loader.js";
+import { CacheService } from "./js/cache.js";
 
 function renderCard(event) {
     const card = document.createElement("div");
@@ -94,12 +204,21 @@ function renderCard(event) {
     const row = document.createElement("div");
     row.className = "row";
 
+    if (event.image) {
+        const img = document.createElement("img");
+        img.className = "event-img";
+        img.src = event.image;
+        img.alt = event.title;
+        img.loading = "lazy";
+        row.appendChild(img);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "row-meta";
+
     const timeEl = document.createElement("div");
     timeEl.className = "time";
     timeEl.textContent = event.time ?? "";
-
-    const content = document.createElement("div");
-    content.className = "content";
 
     const title = document.createElement("div");
     title.className = "title";
@@ -109,8 +228,8 @@ function renderCard(event) {
     place.className = "place";
     place.textContent = event.place ?? "";
 
-    content.append(title, place);
-    row.append(timeEl, content);
+    meta.append(timeEl, title, place);
+    row.appendChild(meta);
 
     const toggle = document.createElement("div");
     toggle.className = "toggle";
@@ -145,16 +264,48 @@ function renderCard(event) {
     return card;
 }
 
-const providers = [
-    new WordPressProvider("https://jondi.fr"),
-];
+const cache = new CacheService();
+const providerMap = {
+    wordpress: new WordPressProvider("https://jondi.fr"),
+};
+const allProviders = Object.values(providerMap);
 
 const today = new Date();
 const todayDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-const events = await loadEvents(providers, new Date(todayDateString));
+const date = new Date(todayDateString);
 
+const loader = document.getElementById("loader");
 const container = document.getElementById("app");
-events.forEach(event => container.appendChild(renderCard(event)));
+
+function showLoader() {
+    loader.style.display = "flex";
+    container.style.display = "none";
+    container.replaceChildren();
+}
+
+function showEvents(events) {
+    loader.style.display = "none";
+    container.style.display = "";
+    events.forEach(event => container.appendChild(renderCard(event)));
+}
+
+async function loadTab(providerKey) {
+    showLoader();
+    const events = providerKey === "all"
+        ? await loadEvents(allProviders, date, cache)
+        : await loadEventsForProvider(providerMap[providerKey], date, cache);
+    showEvents(events.slice().sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")));
+}
+
+document.querySelectorAll(".tab[data-provider]").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        btn.classList.add("active");
+        loadTab(btn.dataset.provider);
+    });
+});
+
+await loadTab("all");
 </script>
 
 </body>

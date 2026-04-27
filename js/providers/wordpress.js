@@ -33,6 +33,7 @@ export class WordPressProvider extends AbstractProvider {
             place: raw.venue?.venue ?? null,
             description: description || null,
             url: raw.url ?? null,
+            image: raw.image?.url ?? null,
             source: this.name,
         });
     }
